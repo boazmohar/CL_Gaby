@@ -274,8 +274,17 @@ def register_channels(data_path, ref_path, nplanes=1, align_by_chan2=False, suit
                     ops["meanImg"].astype(np.float32), ops)
                 ops["meanImgE"] = meanImgE
         
-        # Save updated ops file
-        np.save(ops["ops_path"], ops)
+        # Check if ops_path exists and is valid
+        ops_path_dir = os.path.dirname(ops["ops_path"])
+        if not os.path.exists(ops_path_dir):
+            print(f"Directory for ops_path does not exist: {ops_path_dir}")
+            # Use the current plane folder instead
+            ops_path_new = os.path.join(os.path.dirname(ops_path), "ops.npy")
+            print(f"Saving ops file to: {ops_path_new}")
+            np.save(ops_path_new, ops)
+        else:
+            # Directory exists, save to original path
+            np.save(ops["ops_path"], ops)
         updated_ops_list.append(ops)
     
     return updated_ops_list
@@ -369,20 +378,44 @@ def detect_red_cells(data_path, ref_path, nplanes=1, suite2p_folder=None):
         # Detect red cells
         ops, redstats = chan2detect.detect(ops, stat)
         
-        # Save updated ops file and redcell stats
-        np.save(ops_path, ops)
+        # Check if ops_path directory exists and is valid
+        ops_path_dir = os.path.dirname(ops_path)
+        if not os.path.exists(ops_path_dir):
+            print(f"Directory for ops_path does not exist: {ops_path_dir}")
+            # Use the current plane folder instead
+            ops_path_new = os.path.join(os.path.dirname(ops_path), "ops.npy")
+            print(f"Saving ops file to: {ops_path_new}")
+            np.save(ops_path_new, ops)
+        else:
+            # Directory exists, save to original path
+            np.save(ops_path, ops)
         
         # Update reference ops file with channel 2 information
-        ref_ops_path = ref_path / f"plane{ipl}" / "ops.npy"
+        ref_ops_path = ref_path / ref_suite2p_folder / f"plane{ipl}" / "ops.npy"
         if os.path.exists(ref_ops_path):
-            ref_ops = np.load(ref_ops_path, allow_pickle=True).item()
-            ref_ops["meanImg_chan2"] = ops["meanImg_chan2"]
-            ref_ops["meanImg_chan2_corrected"] = ops["meanImg_chan2_corrected"]
-            ref_ops["nchannels"] = 2
-            np.save(ref_ops_path, ref_ops)
+            try:
+                ref_ops = np.load(ref_ops_path, allow_pickle=True).item()
+                ref_ops["meanImg_chan2"] = ops["meanImg_chan2"]
+                ref_ops["meanImg_chan2_corrected"] = ops["meanImg_chan2_corrected"]
+                ref_ops["nchannels"] = 2
+                np.save(ref_ops_path, ref_ops)
+            except Exception as e:
+                print(f"Error updating reference ops file: {e}")
         
         # Save redcell stats
-        np.save(redcell_paths[ipl], redstats)
+        try:
+            # Make sure directory exists
+            redcell_dir = os.path.dirname(redcell_paths[ipl])
+            if not os.path.exists(redcell_dir):
+                print(f"Directory for redcell file does not exist: {redcell_dir}")
+                # Use the current reference plane folder instead
+                redcell_path_new = os.path.join(ref_path, ref_suite2p_folder, f"plane{ipl}", "redcell.npy")
+                print(f"Saving redcell file to: {redcell_path_new}")
+                np.save(redcell_path_new, redstats)
+            else:
+                np.save(redcell_paths[ipl], redstats)
+        except Exception as e:
+            print(f"Error saving redcell file: {e}")
         redcell_list.append(redstats)
     
     return redcell_list
